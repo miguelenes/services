@@ -13,5 +13,5 @@
 ## 3. Validate the local and hosted checks
 
 - [x] 3.1 Run `openspec validate add-hosted-runner-smoke --strict` and inspect `openspec status --change add-hosted-runner-smoke --json`; record any remaining hosted-only work as pending.
-- [ ] 3.2 Validate `.github/workflows/runner-image-smoke.yml` syntax and inspect that its trigger, runner, permissions, timeout, concurrency, preset-sourced digest, and isolated container invocation match this contract.
-- [ ] 3.3 Once the workflow and preset are available on the selected target repository ref, dispatch with `gh-axi workflow run` and inspect the completed result with `gh-axi run view`; confirm the evidence is limited to image availability and tokenless refusal.
+- [x] 3.2 Validate `.github/workflows/runner-image-smoke.yml` syntax and inspect that its trigger, runner, permissions, timeout, concurrency, preset-sourced digest, and isolated container invocation match this contract.
+- [x] 3.3 Once the workflow and preset are available on the selected target repository ref, dispatch with `gh-axi workflow run` and inspect the completed result with `gh-axi run view`; confirm the evidence is limited to image availability and tokenless refusal.
