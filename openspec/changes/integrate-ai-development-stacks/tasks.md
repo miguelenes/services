@@ -1,31 +1,35 @@
 # Tasks
 
-## 1. Define and validate the catalog contracts
+## 1. Define and validate the store contracts
 
-- [ ] 1.1 Add versioned JSON Schemas for the existing single-service preset format and the new bundle descriptor format; verify every current YAML preset and `services/index.json` entry validates against the schemas.
-- [ ] 1.2 Implement a local catalog preflight command that checks schema validity, index-to-file parity, duplicate names, dependency cycles, supported platform metadata, and committed secret literals; verify it passes the current catalog and rejects fixtures for each invalid case.
-- [ ] 1.3 Add a CI workflow that runs the static catalog preflight on proposed changes; verify invalid schema, index, dependency, platform, resource-limit, and secret fixtures fail the job without pulling images.
-- [ ] 1.4 Document the bundle manifest fields, safety limits, platform and resource-limit declarations, and exact preflight command in the contribution guide; verify a contributor can validate a sample bundle using only the documented instructions.
+- [ ] 1.1 Add Draft 2020-12 schemas for existing service presets, the bundle index, and bundle descriptors; verify every current preset/index entry validates and negative fixtures fail with file and field details.
+- [ ] 1.2 Add the Python catalog preflight command with pinned YAML/schema dependencies; verify full-catalog mode checks index parity, duplicate names, paths, dependency cycles, image/platform metadata, resource limits, and secret literals without network access.
+- [ ] 1.3 Add a read-only CI workflow for push and pull-request events that runs the exact documented preflight command; verify invalid schema, index, dependency, platform, resource, and secret fixtures fail the job without pulling images.
+- [ ] 1.4 Document bundle/index paths relative to the existing `LERD_SERVICES_BASE_URL`, descriptor fields, safety limits, local preflight command, and CI behavior in the contribution guide; verify the example command works from a fresh checkout.
 
-## 2. Add Lerd runtime support for service bundles
+## 2. Add the Lerd runtime companion
 
-- [ ] 2.1 Create and land the paired Lerd runtime change for the versioned bundle contract; verify a fixture bundle is discovered only by compatible Lerd versions and existing single-service catalog behavior still works.
-- [ ] 2.2 Implement bundle component naming, internal service networking, loopback host publishing, durable state, readiness ordering, partial-failure reporting, grouped lifecycle operations, and optional per-component CPU/memory limits on supported runtime profiles; verify lifecycle behavior through CLI, UI, and MCP and verify unsupported limits are rejected before image pulls.
-- [ ] 2.3 Add platform compatibility checks before image pulls and bundle-local secret handling; verify unsupported OS/architecture pairs are refused before download and no catalog or committed project file contains generated credentials.
-- [ ] 2.4 Run the Lerd local preflight (`lerd-preflight`) and exercise a live bundle install/start/stop path; record the Lerd release or minimum version that supports this bundle schema.
+- [ ] 2.1 Implement bundle registry fetch and schema-version gating relative to the service-catalog base URL; verify a runtime supporting version 1 discovers a fixture at `bundles/index.json` and an older runtime continues using `services/index.json` only.
+- [ ] 2.2 Implement complete bundle preflight for descriptor, host/image platform, ports, readiness, secret references, and dependency cycles; verify every invalid case fails before any image pull or unit/volume creation.
+- [ ] 2.3 Implement aggregate image-size preview, explicit confirmation, offline descriptor caching, and component-level lifecycle serialization; verify no image is fetched before confirmation, status/stop/remove work offline, and duplicate or concurrent operations do not create duplicate state.
+- [ ] 2.4 Implement grouped install/start/inspect/update/stop/remove, dependency readiness, persistent-state retention, retryable partial-failure reporting, secret redaction, and supported optional CPU/memory limits; verify each lifecycle and failure path through CLI, UI, and MCP, including unsupported-limit rejection before pull.
+- [ ] 2.5 Update `lerd-dev` and `lerd-preflight` for bundle setup, host/container URLs, the trusted-network boundary, and the live bundle smoke; verify the companion runtime passes the full local preflight and a fixture-bundle lifecycle smoke.
 
-## 3. Publish an Ollama-backed developer path
+## 3. Publish the Ollama and Open WebUI path
 
-- [ ] 3.1 Add an Open WebUI service preset with a pinned reviewed image, persistent application data, an Ollama family dependency, and `OLLAMA_BASE_URL` wired to the in-network Lerd endpoint; verify it validates and its dependency resolves to the installed Ollama preset.
-- [ ] 3.2 Verify Ollama model persistence and Open WebUI model discovery on a supported CPU-only Lerd host; record the image references, host profile, and observed results in the integration guide.
+- [ ] 3.1 Add a digest-pinned Open WebUI preset with persistent app data, dependency on the `ollama` family, and internal `OLLAMA_BASE_URL`; verify preset schema validation and dependency resolution against the existing Ollama preset.
+- [ ] 3.2 Add Ollama model-bootstrap disclosure before download, including configured model names, known/unknown size, and explicit confirmation; verify it prompts only for models absent from persistent model data and works whether Ollama starts directly or through Open WebUI.
+- [ ] 3.3 Verify Open WebUI lists models on a supported CPU-only rootless-Podman profile and model data survives container recreation; document the exact host and in-container URLs and observed model/bootstrap behavior in the AI section of README.
 
 ## 4. Add the Firecrawl bundle
 
-- [ ] 4.1 Select one Firecrawl release and verify matching API, Playwright, Redis, RabbitMQ, and `nuq-postgres` images plus platform manifests against that release's upstream Compose configuration; record pinned tags or digests and supported platform pairs before writing the bundle descriptor.
-- [ ] 4.2 Add the Firecrawl bundle descriptor with isolated dependencies, durable state, generated or operator-supplied secrets, local-only API publication, Ollama unset by default, and only those optional CPU/memory limits that the selected host/runtime profile can enforce; do not encode an unverified minimum resource recommendation. Verify the descriptor passes preflight and unsupported platform or resource settings are rejected before image pulls.
-- [ ] 4.3 Run the bundle on a supported rootless-Podman host and exercise a real `POST /v2/scrape` request; verify the returned extraction includes Markdown and that a deliberately stopped required component is reported as not ready with its component name.
+- [ ] 4.1 Select one Firecrawl release and verify API, Playwright, Redis, RabbitMQ, and `nuq-postgres` image digests, host architectures, config, authentication defaults, current advisories, and direct/redirect-to-private-address behavior; record evidence and exclude any unverified host profile or release.
+- [ ] 4.2 Add the Firecrawl descriptor under `services/bundles/` with isolated dependencies, durable state, generated/operator secrets, internal readiness, loopback API publication, supported hosts, and Ollama unset by default; include resource caps only on profiles where they are enforceable and verify preflight rejects unsupported settings before pulls.
+- [ ] 4.3 Run the bundle on a supported rootless-Podman host and issue a controlled `POST /v2/scrape`; verify Markdown extraction, component readiness, named failure when a required member is stopped, and the recorded private/redirect target policy.
+- [ ] 4.4 Document Firecrawl’s components, data retention, image sizes, host/in-network URLs, unauthenticated API reachability from Lerd containers, trusted-local use, and verified target-safety behavior; verify each documented claim against the selected release and integration result.
 
-## 5. Document and review the integration
+## 5. Complete cross-catalog integration
 
-- [ ] 5.1 Update the catalog README with the Ollama/Open WebUI path, Firecrawl components and platform support, host versus in-container URLs, image/data expectations, and the unauthenticated-local-API boundary; verify each command and URL against the completed runtime.
-- [ ] 5.2 Run the catalog preflight across every preset and bundle and review the rendered catalog metadata against the descriptors; record the exact command and result before opening a change.
+- [ ] 5.1 Run the catalog preflight over all current presets and bundles and review index-to-descriptor metadata parity; verify legacy service entries and searches are unchanged.
+- [ ] 5.2 Run the compatible runtime against the local service-store URL and verify it fetches the descriptor from `bundles/index.json`, previews all required images, and completes the supported fixture and Firecrawl smoke paths; record runtime version and host profile.
+- [ ] 5.3 Validate both OpenSpec changes with strict validation and review task/status evidence; verify no deferred capability or unsupported platform is represented as installable.

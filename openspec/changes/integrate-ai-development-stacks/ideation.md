@@ -54,3 +54,29 @@ Make local inference and web research usable in Lerd projects through maintained
 ### Deferred
 
 LiteLLM, Langfuse, Qdrant, workflow builders, more crawlers, GPU-specific variants, Context.dev credentials/integration, and self-modifying harness behavior are excluded from the first change. Add them after the bundle contract and its failure, security, and update behavior are proven.
+
+## Enhancement audit
+
+### Pass 1: applied and deferred
+
+- **APPLY — host-catalog path.** The local store server serves the existing `services/` directory, so the bundle registry belongs under `services/bundles/` and can be fetched relative to the current `LERD_SERVICES_BASE_URL` without a second setting.
+- **APPLY — image and model download disclosure.** Lerd already gates missing service-image pulls on confirmation. Bundle previews should aggregate those images; Ollama model weights are a separate, potentially large download and need their own model-name and known/unknown-size disclosure.
+- **APPLY — describe the actual Ollama model.** The current preset bootstraps `qwen3-embedding:8b`, which is an embedding model. Open WebUI can list it, but the plan must not promise chat generation until a user-selected chat model is present.
+- **APPLY — trust boundary for Firecrawl.** Firecrawl’s documented local configuration has no API authentication. Loopback host binding does not prevent containers on Lerd’s shared network from reaching its internal hostname, so the setup guide must state the trusted-container boundary.
+- **APPLY — redirect/private-target review.** The GitHub advisory for CVE-2026-32857 reports that Firecrawl 2.8.0 and earlier did not revalidate redirect destinations in the Playwright service. Image selection and integration validation must cover redirect-to-private-address behavior.
+- **APPLY — CI boundaries.** Static catalog validation belongs on pull requests and pushes without credentials or image pulls. The existing runner image workflow remains a separate opt-in `workflow_dispatch` check.
+- **DEFER — per-project bundle networks and private-host allowlists.** These would broaden the runtime topology and may conflict with scraping local development sites. The initial contract states the shared-network trust boundary and does not imply fine-grained isolation.
+- **DEFER — GPU access and model performance profiles.** Current evidence does not establish portable rootless Podman GPU support or universal resource sizing.
+- **DEFER — further AI catalog breadth and self-improving agent loops.** They add separate image-maintenance, evaluator, sandbox, and acceptance responsibilities.
+
+### Pass 2: coherence and risk challenge
+
+- The existing Ollama bootstrap uses a model name but does not show a size or ask before downloading. The proposal adds a distinct model-weight confirmation; image pull confirmation alone would not cover it.
+- Firecrawl’s API is unauthenticated in its local quickstart, while Lerd’s service network is shared. The plan now makes the reachable-container boundary explicit and refuses wider host publication without an authentication policy.
+- Firecrawl’s scraper accepts URLs and has a documented historical redirect SSRF issue. A digest pin by itself does not prove safe redirect handling, so the selected release must pass direct and redirected private-target checks before it is advertised for use by trusted local callers.
+- Both active changes mention README and CI, but their contracts do not conflict: the AI proposal owns the service catalog/preflight section and push/PR checks; `add-hosted-runner-smoke` owns the GitHub Actions runner section and manual workflow. Keep edits to those sections scoped.
+- The registry path stays relative to the configured `services/` root, preserving the local store configuration and older clients that never fetch the new bundle index.
+
+### Pass 3: synthesis
+
+The proposal now makes the catalog URL, schema version, install confirmation, runtime companion, service-network trust boundary, and runtime evidence gates explicit. Ollama, Open WebUI, and Firecrawl remain the initial user-facing path. Private network isolation, private-target allowlisting, GPU profiles, additional AI products, and agent self-modification remain deferred until their compatibility and security models are independently proven.
