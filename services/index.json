@@ -207,6 +207,18 @@
       "color": "#ff6b35"
     },
     {
+      "name": "open-webui",
+      "description": "Open WebUI chat interface for the Lerd Ollama service",
+      "dashboard": "http://localhost:3000",
+      "image": "ghcr.io/open-webui/open-webui:v0.12.0@sha256:1565038903151ced924b5a3226f73f40f16963df4b910441f6391f10144afdaa",
+      "depends_on": [
+        "ollama"
+      ],
+      "category": "other",
+      "icon": "database",
+      "color": "#1f6feb"
+    },
+    {
       "name": "opensearch",
       "description": "OpenSearch single-node search and analytics engine",
       "image": "docker.io/opensearchproject/opensearch:2.19.5",

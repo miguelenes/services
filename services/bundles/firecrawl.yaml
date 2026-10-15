@@ -1,0 +1,129 @@
+schema_version: 1
+name: firecrawl
+version: 2.11.162-catalog.1
+description: >-
+  Trusted-local Firecrawl self-host stack. API is pinned to the v2.11.162
+  release; Playwright and NuQ Postgres are pinned to the official immutable
+  GHCR digests reviewed on 2026-10-14. Compatible Lerd bundle support is
+  required before installation.
+components:
+  - name: redis
+    image: docker.io/library/redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    supported_hosts:
+      - os: linux
+        architecture: amd64
+      - os: linux
+        architecture: arm64
+    ports:
+      - name: redis
+        container_port: 6379
+    readiness:
+      type: tcp
+      port: redis
+  - name: rabbitmq
+    image: docker.io/library/rabbitmq:3-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
+    supported_hosts:
+      - os: linux
+        architecture: amd64
+      - os: linux
+        architecture: arm64
+    environment:
+      RABBITMQ_DEFAULT_USER: firecrawl
+      RABBITMQ_DEFAULT_PASS: secret://firecrawl-rabbitmq-password
+    secrets:
+      - name: firecrawl-rabbitmq-password
+        target_env: RABBITMQ_DEFAULT_PASS
+        source: operator
+    ports:
+      - name: amqp
+        container_port: 5672
+    readiness:
+      type: tcp
+      port: amqp
+  - name: nuq-postgres
+    image: ghcr.io/firecrawl/nuq-postgres@sha256:9b638af78d99873bc0ba2b57c9cbcd01df6ce96efeaa72d36cfbe0f76521e8fc
+    supported_hosts:
+      - os: linux
+        architecture: amd64
+      - os: linux
+        architecture: arm64
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret://firecrawl-postgres-password
+      POSTGRES_DB: postgres
+    secrets:
+      - name: firecrawl-postgres-password
+        target_env: POSTGRES_PASSWORD
+        source: generated
+    ports:
+      - name: postgres
+        container_port: 5432
+    state:
+      - name: nuq-database
+        mount_path: /var/lib/postgresql/data
+    readiness:
+      type: tcp
+      port: postgres
+  - name: playwright-service
+    image: ghcr.io/firecrawl/playwright-service@sha256:717699bf8a61d94451926c810d19ca1d36278192907e307bf5229a558b08fcc6
+    supported_hosts:
+      - os: linux
+        architecture: amd64
+      - os: linux
+        architecture: arm64
+    environment:
+      PORT: 3000
+      ALLOW_LOCAL_WEBHOOKS: "false"
+    ports:
+      - name: http
+        container_port: 3000
+    readiness:
+      type: http
+      port: http
+      path: /health
+  - name: firecrawl-api
+    image: ghcr.io/firecrawl/firecrawl:2.11.162@sha256:1b223ef18d410f67615f32ccaa3dcedfc26af4286f096247bddca3b624545e63
+    supported_hosts:
+      - os: linux
+        architecture: amd64
+      - os: linux
+        architecture: arm64
+    depends_on:
+      - redis
+      - rabbitmq
+      - nuq-postgres
+      - playwright-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      REDIS_RATE_LIMIT_URL: redis://redis:6379
+      PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000/scrape
+      POSTGRES_HOST: nuq-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret://firecrawl-postgres-password
+      POSTGRES_DB: postgres
+      NUQ_RABBITMQ_URL: secret://firecrawl-rabbitmq-url
+      USE_DB_AUTHENTICATION: false
+      BULL_AUTH_KEY: secret://firecrawl-bull-auth-key
+    secrets:
+      - name: firecrawl-postgres-password
+        target_env: POSTGRES_PASSWORD
+        source: generated
+      - name: firecrawl-bull-auth-key
+        target_env: BULL_AUTH_KEY
+        source: generated
+      - name: firecrawl-rabbitmq-url
+        target_env: NUQ_RABBITMQ_URL
+        source: operator
+    ports:
+      - name: http
+        container_port: 3002
+        host_port: 3002
+        publish_host: true
+        host_bind: 127.0.0.1
+    readiness:
+      type: http
+      port: http
+      path: /

@@ -2,77 +2,83 @@
 
 ## Context
 
-See [proposal.md](proposal.md) for motivation and scope. The current store has one YAML preset per service and one `services/index.json` catalogue; the Ollama preset shows the existing single-container path. The checkout has no `schema/` or validator. Lerd currently downloads and operates individual service presets, while Firecrawl’s documented self-host configuration is a multi-container Compose application.
+See [proposal.md](proposal.md) for motivation and scope. The store serves a flat `services/` directory rooted at `LERD_SERVICES_BASE_URL`; `services/index.json` and preset YAML files are fetched relative to that URL. The local store server points at this checkout’s `services/` directory. There is no schema or validator in the checkout.
 
-The new contract must be additive so existing Lerd releases can keep reading `services/index.json` and existing single-image presets unchanged. The runtime half belongs in the Lerd repository; this repository owns the public bundle format, example data, validation, and contribution documentation.
+Firecrawl’s documented self-host stack is multi-container. Its quickstart disables API authentication and describes a trusted-network boundary. Lerd containers share a service network, so an internal hostname is reachable from other Lerd containers even when a host-published port is loopback-only.
+
+The service store owns registry data, schemas, static checks, catalog documentation, and review of candidate image metadata. Lerd runtime behavior and runtime acceptance belong to a separate companion change. Requirements in the delta specs describe the consumer contract; this change’s tracked tasks do not implement or claim that behavior.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Define a small, versioned contract for catalog bundles that Lerd can safely translate into its existing rootless service lifecycle.
-- Prove the contract with Open WebUI + Ollama and a Firecrawl deployment whose API, browser, queue, cache, and database are represented explicitly.
-- Validate catalog data statically and provide an end-to-end Firecrawl readiness check on a supported Lerd host.
+- Define an additive bundle contract that fits the current service-catalog URL and preserves `services/index.json` for existing clients.
+- Validate service presets, bundle indexes, and descriptors locally and in CI without network access or container operations.
+- Prepare reviewed catalog entries and documentation that accurately state their compatibility prerequisites and trust boundaries.
+- Preserve the runtime requirements as a clear contract for the deferred Lerd companion work.
 
 **Non-Goals:**
 
-- Accept arbitrary Docker Compose files, build images from source, or pass arbitrary shell commands to containers.
-- Promise GPU acceleration, production availability, public Internet exposure, or a universal resource floor.
-- Package Context.dev credentials or implement a self-modifying agent harness.
+- Implement or run Lerd bundle discovery, lifecycle, networking, readiness, secret storage, image/model download confirmation, or runtime preflight.
+- Claim that a bundle is installable until a compatible Lerd runtime exists and passes its companion acceptance checks.
+- Accept arbitrary Compose files, builds from source, host mounts, privileged containers, device passthrough, or free-form hooks.
+- Promise GPU access, production availability, a universal resource floor, or isolation from other containers on Lerd’s shared network.
+- Package Context.dev credentials or enable a general-purpose self-modifying agent harness.
 
 ## Decisions
 
-### Keep the existing service index stable and add a separate bundle registry
+### Keep the registry under the existing service-catalog root
 
-Add `bundles/index.json` and `bundles/<bundle-name>.yaml`, plus JSON Schemas under `schema/`. The bundle index contains only discovery metadata and a descriptor path; descriptors use a declared schema version. Lerd versions that do not understand bundles continue using `services/index.json` unchanged. New Lerd versions fetch the bundle registry only when their runtime supports that schema version.
+Store the bundle registry at `services/bundles/index.json` and descriptors at `services/bundles/<slug>.yaml`. From the existing base URL, a future compatible runtime can fetch `bundles/index.json` and descriptor paths relative to that catalog root. This keeps the current local server and published service URL usable. Keep `services/index.json` compatible with older Lerd clients.
 
-**Alternative considered:** Put bundle entries into the existing `services/index.json`. That makes older clients depend on undocumented unknown-field behavior and risks changing a stable service-only payload. A separate registry gives the runtime an explicit capability boundary.
+The bundle index is a JSON object with `schema_version: 1` and a `bundles` array. Each entry has a unique `name`, `description`, and relative `descriptor` path. The descriptor repeats `schema_version: 1`, carries its own `name` and release `version`, and contains a non-empty `components` array. Runtime version gating is a companion requirement, not code delivered here.
 
-### Use a constrained manifest, not Docker Compose passthrough
+**Alternative considered:** Put `bundles/` at the repository root. That would not be reachable from the configured local catalog base URL, which serves the `services/` directory, without changing the server root or adding another URL setting.
 
-The manifest describes a named set of image components, image references and supported OS/architecture pairs, internal ports, host-published ports, environment mappings, persistent state, dependencies/readiness, and supported resource/security settings. Optional per-component CPU and memory limits are accepted only on host/runtime profiles where Lerd can enforce them; omitted limits leave runtime defaults in place, and limits are not a resource-sizing recommendation. It has no arbitrary host mounts, privileged mode, device passthrough, or free-form shell hooks. Lerd validates the descriptor and current-host compatibility before pulling images and rejects unsupported fields or dependency cycles.
+### Use strict, typed descriptors and schemas
 
-**Alternative considered:** Ship Firecrawl’s upstream Compose file and ask users to run it. That bypasses Lerd’s lifecycle, service UI, rootless systemd ownership, and project endpoint wiring, and it makes the catalog claim less useful than a Lerd service preset.
+Use JSON Schema Draft 2020-12 for `schema/service-preset-v1.schema.json`, `schema/bundle-index-v1.schema.json`, and `schema/service-bundle-v1.schema.json`. Parse YAML descriptors to JSON-compatible values before validation. A Python 3 preflight command (`python3 tools/catalog_preflight.py`) uses pinned PyYAML and `jsonschema` development dependencies from a lock file. It has no network access and does not start containers.
 
-### Translate a bundle into Lerd-managed component units
+Bundle schemas reject unknown fields. Structural rules cover schema version, unique DNS-style names, digest-pinned OCI images, dependency references and cycles, supported host OS/architecture pairs, declared ports, structured readiness checks, persistent state paths, environment mappings, secret sources, and optional CPU/memory caps. The preflight validates catalog-owned structure and cross-references; it does not assert that an image runs or that a runtime can enforce a declaration.
 
-`lerd service preset firecrawl` creates one unit per component with stable bundle-scoped service names on Lerd’s service network. Internal dependencies are reachable by those names; only declared bundle entrypoints are host-published, bound to loopback by default. A bundle-level operation presents one install/start/stop/update/remove control while retaining component logs, health, image version, and failure detail.
+**Alternative considered:** Use Compose as the descriptor. That imports arbitrary host/runtime behavior and does not give the store a stable, bounded contract to validate.
 
-Data directories and per-bundle runtime state are separate from image versions. Updates replace image references while preserving declared data. A failed update reports the completed and failed components and retains data for retry or rollback; stateful migrations are not claimed to be transactionally reversible.
+### Treat lifecycle behavior as a companion consumer contract
 
-**Alternative considered:** Use a separate private network for every bundle. Lerd-managed PHP and custom-container projects need to reach the service endpoints on Lerd’s shared network; a private network would require a second routing/proxy layer. The first version therefore keeps internal component ports unpublished and scopes hostnames by bundle, while exposing only explicitly declared entrypoints on loopback.
+The descriptor expresses the information a compatible Lerd runtime needs: component identity, dependencies, readiness, internal ports, explicit host entrypoints, state, secrets, supported platforms, and optional limits. The specs retain the expected behavior for bundle discovery, preflight-before-pull, preview and confirmation, grouped lifecycle, failure reporting, offline management, and data retention. A separate Lerd change owns implementation and runtime evidence for those requirements.
 
-### Generate bundle-local credentials and keep unauthenticated services local
+The store may publish descriptor examples and image metadata, but documentation must label installability as dependent on the compatible runtime. Firecrawl must not be advertised as ready for use until the companion runtime’s end-to-end scrape and trust-boundary checks pass.
 
-Any credential required for internal service-to-service communication is generated at install time or requested from the operator, then persisted in user-only local Lerd state with restrictive permissions. It is never stored in the catalog, `services/index.json`, a committed `.lerd.yaml`, or project-facing endpoint values. Firecrawl’s unauthenticated local API is published only on loopback by default; broader exposure remains a separate operator decision with an explicit supported authentication and network policy.
+**Alternative considered:** Count a valid descriptor as a runnable bundle. Static validation cannot establish image availability, runtime compatibility, dependency health, or scrape success.
 
-**Alternative considered:** Reuse Lerd’s shared PostgreSQL, Redis, or RabbitMQ presets for Firecrawl. The inspected Firecrawl Compose configuration uses a Firecrawl-specific Postgres image and its own queue/cache services; sharing Lerd’s app database would weaken isolation and may omit required Postgres behavior.
+### Keep catalog validation separate from runtime acceptance
 
-### Build the AI path from existing services and keep model providers optional
+The store’s preflight checks schemas, index-to-file parity, duplicate names, safe relative paths, dependency cycles, platform declarations, resource-limit shape, and committed secret literals. CI runs the exact documented static command on pushes and pull requests without credentials or image pulls.
 
-Keep the current Ollama preset as the local inference endpoint, add Open WebUI as a dependent single-container preset with its own persistent state, and add Firecrawl as a bundle with a dedicated Postgres, Redis, RabbitMQ, and Playwright component. Firecrawl’s optional `OLLAMA_BASE_URL` is unset unless the user selects a Lerd-managed Ollama endpoint. Project-facing values use Lerd DNS names from containers; documentation gives loopback host URLs for host processes.
+Runtime acceptance remains in the deferred companion plan: compatible-host lifecycle, actual readiness, downloads, and a Firecrawl scrape through the selected release. Neither this store preflight nor CI claims to substitute for those checks.
 
-Images are pinned to a reviewed release tag or digest. Firecrawl’s inspected Compose file builds the API and Playwright service from source by default even though GHCR packages exist. Implementation must verify version alignment, availability, and supported architectures for the API, Playwright, and `nuq-postgres` images before marking the bundle installable. If a compatible image set is unavailable for a host profile, mark that profile unsupported rather than building arbitrary project source during service installation.
+**Alternative considered:** Run the full bundle in ordinary catalog CI. That would require privileged container infrastructure, large downloads, credentials or external network access, and could not replace the runtime project’s host-specific acceptance.
 
-### Separate static catalog checks from runtime acceptance
+### Keep the first catalog path narrow
 
-The store provides a documented local preflight command for schema validation, index-to-file parity, duplicate-name and dependency-graph checks, platform metadata, optional resource-limit compatibility, and secret-literal checks. CI runs the same static preflight so catalog errors block review consistently. Before Firecrawl is published, a supported rootless-Podman integration run verifies bundle lifecycle and a real Firecrawl scrape. Lerd runtime changes also pass the existing `lerd-preflight` sequence, including install and a live smoke check of the affected service surface.
+Keep the existing Ollama preset; add Open WebUI as a dependent single-service preset and define Firecrawl as a bundle only after the selected image set and supported platforms are reviewed. Catalog documentation distinguishes the existing embedding model from a chat model, host loopback URLs from in-container service names, and the shared-network reachability of Firecrawl’s unauthenticated API.
 
-**Alternative considered:** Treat schema validation or container liveness as complete verification. The former cannot catch registry/runtime incompatibility; the latter does not establish that Firecrawl can scrape through its browser, queue, database, and outbound network.
+Do not claim model-download confirmation, grouped install, or runtime readiness until the companion implements and verifies those behaviors. Image/model download sizes and confirmation remain Lerd runtime responsibilities.
+
+**Alternative considered:** Expand into a broad AI catalog now. That would add more image-maintenance and security work before the bundle contract has a maintained example.
 
 ## Risks / Trade-offs
 
-- **Risk:** A bundle can fail after only some containers start. → **Mitigation:** Track member state, stop dependent members, preserve state, and provide retry/rollback detail.
-- **Risk:** Upstream image or environment contracts drift. → **Mitigation:** Pin reviewed references, validate the selected release, and run the scrape smoke after updates.
-- **Risk:** One bundle consumes substantial disk, memory, CPU, and outbound bandwidth. → **Mitigation:** Show components and image references before install, keep Ollama optional, do not claim minimum sizing, and use Lerd’s existing image-size disclosure where available.
-- **Risk:** Firecrawl’s API is unauthenticated in its documented local baseline. → **Mitigation:** Loopback-only host binding by default and explicit warnings before any wider exposure.
-- **Risk:** The catalog contract and Lerd runtime ship out of order. → **Mitigation:** Keep the separate registry undiscoverable to unsupported runtime versions and publish Firecrawl only after the Lerd companion change lands.
+- **Risk:** Users may mistake a valid catalog descriptor for an installable feature. → **Mitigation:** State that compatible Lerd runtime support is a prerequisite and gate installability claims on companion evidence.
+- **Risk:** Upstream images or environment contracts drift. → **Mitigation:** Pin reviewed image digests and platform metadata; require review before changing them.
+- **Risk:** Firecrawl’s local API is unauthenticated and reachable from Lerd containers. → **Mitigation:** Document trusted-container access and loopback-only host publication in the descriptor contract.
+- **Risk:** Static validation passes while runtime behavior fails. → **Mitigation:** Keep separate companion lifecycle and scrape acceptance criteria; do not represent static CI as runtime proof.
 
 ## Migration Plan
 
-1. Land the bundle schema and validator in this repository without changing `services/index.json` or existing preset behavior.
-2. Land the Lerd runtime companion behind bundle-schema support, then validate install/start/update/stop/remove and local endpoint wiring with a small fixture bundle.
-3. Add Open WebUI and the Firecrawl bundle only after compatible images and local-only exposure are verified; run the actual scrape path.
-4. Document `lerd service preset`, project environment setup, host/container URLs, and the Lerd preflight evidence required for future updates.
+1. Add schemas and static preflight without changing `services/index.json` or existing preset behavior.
+2. Add the bundle registry format, reviewed catalog entries, and contribution/service documentation. Clearly mark runtime compatibility as a prerequisite.
+3. In a separate Lerd companion change, implement the consumer contract and run the Lerd preflight plus supported-host lifecycle and Firecrawl scrape acceptance.
+4. Only after that companion evidence exists, describe Firecrawl as installable for the verified runtime and host profile.
 
-Rollback disables bundle-registry discovery in Lerd while leaving existing single-service presets intact. Removing an installed bundle follows Lerd’s normal data-retention choice; no rollback step deletes persistent state implicitly.
+The store change can be rolled back by removing the new registry and catalog entries; existing single-service presets remain usable.

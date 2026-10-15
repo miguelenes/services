@@ -2,53 +2,57 @@
 
 ## Why
 
-Lerd’s external catalog makes single-container services easy to add, and this store already has an Ollama preset, but it cannot describe a complete developer stack such as self-hosted Firecrawl. Firecrawl’s published deployment needs multiple cooperating containers, persistent state, configuration, and startup checks; a catalog-only preset would imply support that the current contract cannot provide.
+Lerd’s service catalog currently describes one container per preset, while a useful local AI and web-research setup can combine independently stateful services. Firecrawl’s self-hosted topology needs several coordinated containers; representing it as a normal preset would hide its lifecycle, downloads, readiness, network trust boundary, and recovery behavior.
 
-This change defines a Lerd-consumable service-bundle contract and uses it to connect local inference and web research to ordinary project setup. It also adds a store-owned validation gate so presets and bundles are checked before publication.
+This change defines and validates the service-store side of a versioned bundle contract and catalogs a reviewed local AI path. Lerd runtime behavior is a separate companion change and is deferred; this change does not implement it or claim the bundles can already be installed.
 
 ## What Changes
 
-- Add a versioned bundle format for grouping pinned container images, dependencies, ports, durable data, health/readiness checks, generated or supplied secrets, and project-facing environment values under one installable Lerd service.
-- Require Lerd to install, start, inspect, update, and remove a bundle as one unit while preserving data and reporting partial failures. Bundle members must have an internal network, explicit supported-platform metadata, and a host-facing API that remains local by default.
-- Publish an AI development path that builds on the existing Ollama preset, adds Open WebUI as a dependent dashboard, and offers Firecrawl as a bundle with its own API, browser service, queue, cache, and Firecrawl-specific Postgres image. Ollama remains optional for Firecrawl and is configured only when selected.
-- Document the app-facing connection path for Lerd projects, including the container-network URL and host URL, and show the `lerd env` / setup workflow without placing credentials in committed presets.
-- Add schemas and a preflight validator for preset and bundle files, catalog/index consistency, dependency graphs, image references, platform compatibility, and secret hygiene; run the static preflight locally and in CI. Add an integration smoke check for a small bundle and the Firecrawl scrape path.
-- Pair Lerd runtime work with its existing local preflight gate (`lerd-preflight`) and update the Lerd development guidance (`lerd-dev`) for bundle setup, endpoint wiring, and verification.
+- Define a versioned bundle registry and descriptor format under `services/bundles/`, rooted at the existing service-catalog URL so local and hosted Lerd installations can fetch it without changing their base URL. Preserve `services/index.json` for existing clients.
+- Add schemas and a local preflight validator for current presets, bundle descriptors, indexes, dependencies, image/platform declarations, resource limits, and secret hygiene. Run the network-free static preflight in repository CI.
+- Extend the catalog with an Ollama-dependent Open WebUI preset and a Firecrawl bundle only after the selected images, supported platforms, persistence, authentication baseline, and redirect/private-address behavior have been reviewed.
+- Document the catalog contract, endpoint values, model/image download expectations, and Firecrawl’s trusted-local access boundary. Keep runtime setup guidance conditional on the companion Lerd support.
+- Record the Lerd runtime behavior needed to consume these descriptors as a companion contract, including version gating, grouped lifecycle, readiness, local-only host publishing, download confirmation, and component-level failures. Implementation and runtime-only acceptance are deferred to that companion change.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `service-bundles`: declarative, lifecycle-managed groups of service containers that Lerd can install and operate as one unit.
-- `local-ai-development`: curated local inference and web-research services with clear project connection settings and verified readiness.
+- `service-bundles`: versioned, validated catalog descriptors for groups of container services, defining dependencies, state, networking, secrets, downloads, platforms, and expected lifecycle behavior for a compatible Lerd runtime.
+- `local-ai-development`: catalog definitions and accurate setup information for Ollama, Open WebUI, and a reviewed Firecrawl bundle, including endpoint, model-download, readiness, and trust-boundary expectations.
 
 ### Modified Capabilities
 
-None. This repository currently has no published OpenSpec capability specs.
+None. This checkout has no published OpenSpec capability specs.
 
 ## Impact
 
-The service catalog (`services/index.json` and `services/*.yaml`), a new `bundles/` directory, a new `schema/` directory, validation tooling, a CI workflow, and documentation will change here. A companion change in the Lerd runtime must consume bundle descriptors and provide grouped lifecycle, networking, configuration, resource-limit, and readiness behavior before a bundle is advertised as installable. The Lerd dev workflow should document app configuration; the Lerd preflight should exercise the new runtime surface. No runtime implementation is included in this repository proposal.
+This repository will add `services/bundles/`, schemas under `schema/`, a preflight tool and CI workflow, and contributor and service documentation. A separate companion change in the Lerd repository must consume `bundles/index.json` relative to the existing service-catalog base URL and implement the runtime contract before any bundle is described as installable. Updating Lerd development guidance and its `lerd-preflight` workflow also belongs to that companion. This change owns no Lerd runtime implementation or runtime acceptance run.
 
-## Deferred ideas
+## Deferred Ideas
 
-- A broad AI lab catalog (LiteLLM, Langfuse, vector stores, workflow builders, and additional crawlers) until the bundle contract has one working, maintained example.
-- GPU passthrough, performance promises, and hardware-specific model profiles; support varies by host, rootless container runtime, and device setup.
-- Context.dev as a container preset: it is a hosted API integration and should remain an optional client-side provider with operator-managed credentials.
-- Self-modifying agent harnesses and their evaluation loops: those need their own evaluator, sandbox, and acceptance controls and are outside a service catalog’s responsibility.
+- Implementing bundle discovery, grouped lifecycle, networking, readiness, secrets, download confirmation, and model-bootstrap confirmation in Lerd.
+- Running a live bundle lifecycle or Firecrawl scrape, and changing Lerd’s `lerd-dev` or `lerd-preflight` workflows.
+- A broad AI lab catalog (LiteLLM, Langfuse, vector stores, workflow builders, and more crawlers) until one bundle is maintained through upgrades and recovery.
+- GPU passthrough, hardware-specific model profiles, and performance promises; support varies by host and rootless container runtime.
+- Context.dev as a container preset; it is a hosted API integration and should remain an optional client-side provider with operator-managed credentials.
+- Self-modifying agent harnesses and their evaluation loops; those need a separate evaluator, sandbox, and acceptance controls.
+- Fine-grained per-project network isolation or private-target allowlists until the selected Firecrawl release and Lerd networking model can support and verify them end to end.
 
 ## Assumptions
 
-- Lerd will accept a paired runtime change for the proposed bundle contract; this store alone cannot make a multi-container bundle run.
-- The first Firecrawl bundle targets its documented local Docker Compose topology and a release-pinned API/browser image set. The exact image availability and configuration will be rechecked against the selected upstream release during implementation.
-- The initial Ollama path is CPU-capable and local. GPU access is not implied by an Ollama container image.
-- Per-component CPU and memory limits are optional operator controls only on host/runtime profiles where Lerd can enforce them. They are not a sizing recommendation or a guarantee of the resources Firecrawl needs.
-- Presets and bundles must never embed hosted API credentials. Any required Firecrawl secret is generated or supplied through Lerd’s local secret handling.
+- The bundle registry will be served relative to the current `services/` catalog root. The local Lerd store server currently serves this checkout’s `services/` directory, so `services/bundles/index.json` is reachable as `<LERD_SERVICES_BASE_URL>/bundles/index.json`.
+- The Lerd runtime team will accept a separate companion change. This store alone cannot run a multi-container bundle.
+- The Firecrawl self-host quickstart is a trusted-network development setup with API authentication disabled; the first bundle is not a production deployment. Every container on Lerd’s shared network must be treated as trusted to call its internal API.
+- The chosen Firecrawl release will pass a review of current advisories and a redirect-to-private-address test. If that behavior cannot be verified, the bundle will not be advertised for use by untrusted callers.
+- The first Ollama path is CPU-capable and local. GPU access is not implied by an Ollama image.
+- Any per-component CPU and memory limits are optional operator controls only where the companion runtime can enforce them; they are not a sizing recommendation or a guarantee that Firecrawl has enough resources.
+- Presets and bundles never embed hosted API credentials. Required Firecrawl secrets are generated or supplied through Lerd’s local secret handling.
 
 ## Evidence
 
-- The current store README describes service presets as image, ports, environment, data, and dependency declarations, and `services/ollama.yaml` already supplies a local endpoint.
-- Firecrawl’s [self-hosting guide](https://docs.firecrawl.dev/contributing/self-host) documents a Compose deployment; its [v2.11.162 Compose file](https://raw.githubusercontent.com/firecrawl/firecrawl/v2.11.162/docker-compose.yaml) includes API, Playwright, Redis, RabbitMQ, and a Firecrawl-specific Postgres image. Public GHCR packages exist for the API and Playwright images, but the Compose file builds them from source by default; exact release compatibility and architecture support remain to be checked. The guide warns that a successful heartbeat does not verify dependencies or an actual scrape, and that its baseline disables API authentication.
-- Ollama’s [Docker guide](https://docs.ollama.com/docker) documents a persistent `/root/.ollama` volume and a CPU-only baseline; its GPU instructions require additional host setup.
-- Open WebUI documents [Ollama endpoint configuration](https://docs.openwebui.com/reference/env-configuration/) through `OLLAMA_BASE_URL` and its [quick start](https://docs.openwebui.com/getting-started/quick-start/).
-- Lerd’s [service preset guide](https://lerd.sh/usage/service-presets) documents existing preset, dependency, family, and environment-wiring behavior. The current checkout has no `schema/` directory or automated validation files despite the repository’s `AGENTS.md` requiring preset validation against `schema/`.
+- The service-store README and current local Lerd setup use `services/index.json` and a base URL rooted at the `services/` directory. The Ollama preset at `services/ollama.yaml` declares the `ollama` family, an internal URL, persistent model data, and `OLLAMA_PULL_MODELS=qwen3-embedding:8b`.
+- Firecrawl’s [self-hosting guide](https://docs.firecrawl.dev/contributing/self-host) describes a trusted-network local setup with API authentication disabled and says a heartbeat does not verify dependencies or an actual scrape. Its [v2.11.162 Compose file](https://raw.githubusercontent.com/firecrawl/firecrawl/v2.11.162/docker-compose.yaml) includes the API, Playwright, Redis, RabbitMQ, and a Firecrawl-specific Postgres image; API and Playwright are built from source by default there, so matching published images and platforms need review.
+- The [CVE-2026-32857 advisory](https://github.com/advisories/GHSA-9j9r-wghq-j565) documents a redirect-based SSRF protection bypass in Firecrawl versions 2.8.0 and earlier. It makes redirect and destination checks a release-selection gate; it does not establish a vulnerability in the proposed later release.
+- Ollama’s [Docker guide](https://docs.ollama.com/docker) documents persistent model storage and CPU/GPU differences. Open WebUI documents `OLLAMA_BASE_URL` in its [environment reference](https://docs.openwebui.com/reference/env-configuration/).
+- Lerd’s [service preset guide](https://lerd.sh/usage/service-presets) documents preset dependencies and environment wiring. This checkout currently has no `schema/` directory or catalog validator, despite `AGENTS.md` requiring preset validation against a schema.

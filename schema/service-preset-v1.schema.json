@@ -1,0 +1,371 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 32
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "update_strategy": {
+      "enum": [
+        "rolling",
+        "major",
+        "minor",
+        "patch",
+        "manual"
+      ]
+    },
+    "ports": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          {
+            "type": "string",
+            "minLength": 1
+          }
+        ]
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      }
+    },
+    "data_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 32
+    },
+    "versions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "image": {
+            "type": "string",
+            "minLength": 1
+          },
+          "host_port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "canonical": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tag",
+          "image"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "default_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "env_vars": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dynamic_env": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "expand_env": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "env_detect": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": ["string", "array", "object", "boolean"]
+      }
+    },
+    "env_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "connection_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dashboard": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dashboard_external": {
+      "type": "boolean"
+    },
+    "dashboard_proxy": {
+      "type": "boolean"
+    },
+    "dashboard_proxy_strip": {
+      "type": "boolean"
+    },
+    "dashboard_proxy_at_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dashboard_proxy_keep_host": {
+      "type": "boolean"
+    },
+    "dashboard_proxy_rebase": {
+      "type": "boolean"
+    },
+    "dashboard_proxy_reroute": {
+      "type": "boolean"
+    },
+    "dashboard_follows_color_scheme": {
+      "type": "boolean"
+    },
+    "dashboard_scheme_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dashboard_login": {
+      "type": "boolean"
+    },
+    "dashboard_locale_cookies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "category": {
+      "enum": [
+        "databases",
+        "cache",
+        "messaging",
+        "search",
+        "mail",
+        "admin",
+        "storage",
+        "testing",
+        "other"
+      ]
+    },
+    "icon": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9-]*$",
+      "maxLength": 64
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "admin_for": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "maxLength": 32
+      },
+      "uniqueItems": true
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "maxLength": 32
+      },
+      "uniqueItems": true
+    },
+    "stop_timeout": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "chown_data": {
+      "type": "boolean"
+    },
+    "userns": {
+      "type": "string",
+      "minLength": 1
+    },
+    "init": {
+      "type": "boolean"
+    },
+    "share_hosts": {
+      "type": "boolean"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "generator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "type": "string",
+            "pattern": "^[0-7]{3,4}$"
+          },
+          "chown": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "content"
+            ]
+          },
+          {
+            "required": [
+              "generator"
+            ]
+          }
+        ]
+      }
+    },
+    "site_init": {
+      "type": "object",
+      "properties": {
+        "exec": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "exec"
+      ],
+      "additionalProperties": false
+    },
+    "client_shims": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string", "minLength": 1},
+          {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "binary": {
+                "oneOf": [
+                  {"type": "string", "minLength": 1},
+                  {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+                ]
+              }
+            },
+            "required": ["name", "binary"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "introspect": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "always": {
+            "type": "boolean"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exec": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "category",
+    "icon"
+  ],
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "image"
+      ]
+    },
+    {
+      "required": [
+        "versions"
+      ]
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lerd.sh/schemas/service-preset-v1.schema.json",
+  "title": "Lerd service preset v1"
+}

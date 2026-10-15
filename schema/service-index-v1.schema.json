@@ -1,0 +1,129 @@
+{
+  "type": "object",
+  "properties": {
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 32
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "image": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 32
+          },
+          "default_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "env_role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "host_port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "canonical": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "tag",
+                "image"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dashboard": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "enum": [
+              "databases",
+              "cache",
+              "messaging",
+              "search",
+              "mail",
+              "admin",
+              "storage",
+              "testing",
+              "other"
+            ]
+          },
+          "icon": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]*$",
+            "maxLength": 64
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "maxLength": 32
+            },
+            "uniqueItems": true
+          },
+          "admin_for": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "maxLength": 32
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "services"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lerd.sh/schemas/service-index-v1.schema.json",
+  "title": "Lerd service index v1"
+}

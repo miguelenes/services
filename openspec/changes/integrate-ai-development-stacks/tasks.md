@@ -1,31 +1,27 @@
 # Tasks
 
-## 1. Define and validate the catalog contracts
+## 1. Define and validate the service-store contracts
 
-- [ ] 1.1 Add versioned JSON Schemas for the existing single-service preset format and the new bundle descriptor format; verify every current YAML preset and `services/index.json` entry validates against the schemas.
-- [ ] 1.2 Implement a local catalog preflight command that checks schema validity, index-to-file parity, duplicate names, dependency cycles, supported platform metadata, and committed secret literals; verify it passes the current catalog and rejects fixtures for each invalid case.
-- [ ] 1.3 Add a CI workflow that runs the static catalog preflight on proposed changes; verify invalid schema, index, dependency, platform, resource-limit, and secret fixtures fail the job without pulling images.
-- [ ] 1.4 Document the bundle manifest fields, safety limits, platform and resource-limit declarations, and exact preflight command in the contribution guide; verify a contributor can validate a sample bundle using only the documented instructions.
+- [x] 1.1 Add Draft 2020-12 schemas for existing service presets, the bundle index, and bundle descriptors; verify every current preset and index entry validates and negative fixtures fail with file and field details.
+- [x] 1.2 Add the Python catalog preflight command with pinned YAML/schema dependencies; verify full-catalog mode checks index parity, duplicate names, safe paths, dependency cycles, image/platform metadata, resource-limit shape, and secret literals without network access or container operations.
+- [x] 1.3 Add a read-only CI workflow for push and pull-request events that runs the exact documented preflight command; verify invalid schema, index, dependency, platform, resource, and secret fixtures fail without pulling images.
+- [x] 1.4 Document bundle/index paths relative to the existing `LERD_SERVICES_BASE_URL`, descriptor fields, safety limits, the local preflight command, and CI behavior in the contribution guide; verify the documented command works from a fresh checkout.
 
-## 2. Add Lerd runtime support for service bundles
+## 2. Prepare the catalog entries and documentation
 
-- [ ] 2.1 Create and land the paired Lerd runtime change for the versioned bundle contract; verify a fixture bundle is discovered only by compatible Lerd versions and existing single-service catalog behavior still works.
-- [ ] 2.2 Implement bundle component naming, internal service networking, loopback host publishing, durable state, readiness ordering, partial-failure reporting, grouped lifecycle operations, and optional per-component CPU/memory limits on supported runtime profiles; verify lifecycle behavior through CLI, UI, and MCP and verify unsupported limits are rejected before image pulls.
-- [ ] 2.3 Add platform compatibility checks before image pulls and bundle-local secret handling; verify unsupported OS/architecture pairs are refused before download and no catalog or committed project file contains generated credentials.
-- [ ] 2.4 Run the Lerd local preflight (`lerd-preflight`) and exercise a live bundle install/start/stop path; record the Lerd release or minimum version that supports this bundle schema.
+- [x] 2.1 Add a digest-pinned Open WebUI preset with persistent app data, dependency on the `ollama` family, and internal `OLLAMA_BASE_URL`; verify schema validation and static dependency resolution against the existing Ollama preset.
+- [x] 2.2 Review Firecrawl API 2.11.162 and the pinned supporting image snapshot for digests, architectures, configuration, authentication defaults, advisories, and direct/redirect-to-private-address behavior.
 
-## 3. Publish an Ollama-backed developer path
+  Evidence recorded in services/bundles/firecrawl.yaml and the service documentation: API 2.11.162 digest sha256:1b223ef18d410f67615f32ccaa3dcedfc26af4286f096247bddca3b624545e63 reports source commit 7666c1f9ae8720a6bba271e0f60b6a217f8a5210. Official GHCR Playwright and NuQ Postgres latest manifest digests are sha256:717699bf8a61d94451926c810d19ca1d36278192907e307bf5229a558b08fcc6 and sha256:9b638af78d99873bc0ba2b57c9cbcd01df6ce96efeaa72d36cfbe0f76521e8fc; their source-commit relationship to that API release is unknown. Redis 7 Alpine and RabbitMQ 3-management are pinned to sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499 and sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69. All five manifests list Linux amd64 and arm64. Upstream Compose uses Redis, RabbitMQ, Playwright and NuQ Postgres as internal dependencies; API auth defaults off (USE_DB_AUTHENTICATION=false), so the descriptor is restricted to trusted-local development. An isolated Playwright source build returned 403 for direct loopback, RFC1918, link-local/metadata and Docker bridge targets. Redirect-to-private end-to-end behavior was not observed; source inspection found request interception plus destination DNS checks in the SSRF proxy, but this is not treated as runtime proof. GHSA-9j9r-wghq-j565 / CVE-2026-32857 affects Firecrawl 2.8.0 and earlier. The unverified release provenance and redirect behavior are explicitly disclosed; no unverified OS/architecture pair or untrusted-caller compatibility is claimed.
+- [x] 2.3 Add the Firecrawl bundle descriptor with isolated dependencies, durable state, generated/operator-supplied secret references, internal readiness, loopback API publication, supported hosts, and Ollama unset by default; verify static preflight rejects unsupported descriptor settings and that catalog files contain no reusable secrets.
+- [x] 2.4 Update catalog documentation with Ollama/Open WebUI model semantics, bundle components, data expectations, host and in-network URL examples, image metadata, Firecrawl’s unauthenticated shared-network boundary, and an explicit compatible-runtime prerequisite; verify each statement against the descriptors and recorded source evidence.
+- [x] 2.5 Run the catalog preflight over all presets and bundles and review index-to-descriptor parity; verify `services/index.json` and existing single-service preset behavior remain unchanged.
 
-- [ ] 3.1 Add an Open WebUI service preset with a pinned reviewed image, persistent application data, an Ollama family dependency, and `OLLAMA_BASE_URL` wired to the in-network Lerd endpoint; verify it validates and its dependency resolves to the installed Ollama preset.
-- [ ] 3.2 Verify Ollama model persistence and Open WebUI model discovery on a supported CPU-only Lerd host; record the image references, host profile, and observed results in the integration guide.
+## Deferred companion scope — Lerd runtime
 
-## 4. Add the Firecrawl bundle
+The following work is retained as a separate companion change and is not counted as completion of this service-store change:
 
-- [ ] 4.1 Select one Firecrawl release and verify matching API, Playwright, Redis, RabbitMQ, and `nuq-postgres` images plus platform manifests against that release's upstream Compose configuration; record pinned tags or digests and supported platform pairs before writing the bundle descriptor.
-- [ ] 4.2 Add the Firecrawl bundle descriptor with isolated dependencies, durable state, generated or operator-supplied secrets, local-only API publication, Ollama unset by default, and only those optional CPU/memory limits that the selected host/runtime profile can enforce; do not encode an unverified minimum resource recommendation. Verify the descriptor passes preflight and unsupported platform or resource settings are rejected before image pulls.
-- [ ] 4.3 Run the bundle on a supported rootless-Podman host and exercise a real `POST /v2/scrape` request; verify the returned extraction includes Markdown and that a deliberately stopped required component is reported as not ready with its component name.
-
-## 5. Document and review the integration
-
-- [ ] 5.1 Update the catalog README with the Ollama/Open WebUI path, Firecrawl components and platform support, host versus in-container URLs, image/data expectations, and the unauthenticated-local-API boundary; verify each command and URL against the completed runtime.
-- [ ] 5.2 Run the catalog preflight across every preset and bundle and review the rendered catalog metadata against the descriptors; record the exact command and result before opening a change.
+- Implement version-gated bundle discovery, descriptor caching, preflight-before-pull, platform checks, download preview/confirmation, grouped lifecycle, readiness, recovery, offline management, secret handling, and supported resource limits; verify through Lerd CLI, UI, and MCP.
+- Implement Ollama model-bootstrap disclosure and confirmation, including model names and known/unknown sizes; verify direct and dependency-triggered startup without redownloading persistent models.
+- Update Lerd’s `lerd-dev` and `lerd-preflight` workflows; verify supported-host bundle lifecycle and a real Firecrawl scrape, recording runtime version and host profile.
+- Gate any claim that Firecrawl is installable or runtime-ready on the companion’s successful lifecycle, trust-boundary, and scrape evidence.

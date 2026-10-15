@@ -1,0 +1,14 @@
+name: open-webui
+description: Open WebUI chat interface for the Lerd Ollama service
+image: ghcr.io/open-webui/open-webui:v0.12.0@sha256:1565038903151ced924b5a3226f73f40f16963df4b910441f6391f10144afdaa
+ports:
+  - "3000:8080"
+environment:
+  OLLAMA_BASE_URL: http://lerd-ollama:11434
+data_dir: /app/backend/data
+depends_on:
+  - ollama
+dashboard: http://localhost:3000
+category: other
+icon: database
+color: "#1f6feb"

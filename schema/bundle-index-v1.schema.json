@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "bundles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 32
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "descriptor": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+\\.yaml$"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "descriptor"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "bundles"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lerd.sh/schemas/bundle-index-v1.schema.json",
+  "title": "Lerd bundle index v1"
+}

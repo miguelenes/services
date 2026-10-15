@@ -109,6 +109,13 @@ All of it is data. None of it ships in the binary.
 | Service | What it is |
 |---------|------------|
 | `ollama` | Ollama local LLM server with automatic model bootstrap |
+| `open-webui` | Persistent chat interface connected to the Lerd Ollama service |
+
+Ollama currently bootstraps `qwen3-embedding:8b`, an embeddings model; that
+bootstrap alone does not provide a chat model. Pull a chat-capable model into
+Ollama before using Open WebUI for chat. Open WebUI keeps its application data
+under `/app/backend/data` and reaches Ollama at `http://lerd-ollama:11434` from
+the shared Lerd service network.
 
 **Content management**
 
@@ -289,6 +296,103 @@ draw the Postgres elephant in Postgres blue rather than a mark of their own.
 The coloured tiles in this README are not the marks themselves. `.github/scripts/readme_logos.py` paints each mark in its declared colour on a white tile, so GitHub shows it in either theme, and a service without one gets the lerd glyph its `icon` names in its category's tint, from copies kept in `.github/glyphs/`. The six services built into lerd are listed too, from the marks and colours mirrored in `.github/builtin/`. It writes the result to `.github/logos/`; run it again whenever a service, its mark or its colour changes.
 
 See the [service presets documentation](https://lerd.sh/usage/service-presets) for the full schema reference and every available field.
+
+### Service bundle catalog (schema v1)
+
+The existing catalog root remains `LERD_SERVICES_BASE_URL`. Single-service
+clients continue to read `services/index.json` exactly as before. Bundle-aware
+clients discover groups at `<LERD_SERVICES_BASE_URL>/bundles/index.json`; its
+`schema_version` is `1`, and each entry points to a YAML descriptor by a safe
+filename relative to the `bundles/` directory, for example
+`bundles/firecrawl.yaml`.
+
+Each descriptor declares its schema version, name, catalog version, description,
+and components. A component has a unique name, immutable OCI image reference
+(`@sha256:<64 lowercase hex digits>`), verified OS/architecture pairs, declared
+ports, and readiness check. Optional fields describe component dependencies,
+environment, generated or operator-supplied secret references, persistent state
+mount paths, and positive CPU/memory caps. Component dependencies must resolve
+inside the bundle and form an acyclic graph. Host-published ports are explicit;
+the descriptor must keep host exposure on loopback. The schema rejects unknown
+fields rather than passing arbitrary container or host commands through.
+
+Bundle descriptors are catalog data, not Compose files. They do not support
+builds, host mounts, privileged containers, device passthrough, or free-form
+hooks. Resource caps are optional controls only; they are not minimum hardware
+recommendations, and a static catalog check does not establish that a runtime
+can enforce them. Do not put reusable credentials in catalog files. Use only
+`secret://<name>` references for secret-valued bundle environment settings.
+
+For a fresh checkout, install the pinned development dependencies and run the
+network-free static preflight:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --requirement requirements-dev.lock
+python3 tools/catalog_preflight.py
+```
+
+The same preflight and its invalid-catalog fixtures run in GitHub Actions on
+pushes and pull requests with read-only repository permissions. It checks
+schemas, index parity, descriptor paths, dependency graphs, image/platform
+metadata, resource values, and secret literals. It does not pull images, start
+containers, or claim that a compatible Lerd runtime can install or operate a
+bundle. Runtime support is a prerequisite and must be verified separately in
+the companion Lerd project.
+
+### Local AI and Firecrawl
+
+The Ollama preset bootstraps `qwen3-embedding:8b`, an embedding model; that
+setting alone does not provide chat completions. Open WebUI is a separate
+preset with its own persistent data at `/app/backend/data` and depends on the
+`ollama` family. Both presets require a compatible Lerd runtime for dependency
+and environment wiring. From a host process Ollama uses
+`http://127.0.0.1:11434`; a Lerd container uses `http://lerd-ollama:11434`.
+
+`services/bundles/firecrawl.yaml` describes a trusted-local stack: the
+Firecrawl API, Playwright browser service, Redis cache/queue support, RabbitMQ
+broker, and NuQ PostgreSQL database. PostgreSQL data persists at
+`/var/lib/postgresql/data`; Redis and RabbitMQ are runtime state, not declared
+durable stores. The API and database share a generated PostgreSQL password.
+RabbitMQ credentials are operator-supplied and must match between its password
+and the API's AMQP URL settings. Ollama integration is unset.
+
+The catalog pins every component by immutable digest. The API is the
+`2.11.162` release (`sha256:1b223ef1…e63`), whose image reports source commit
+`7666c1f9ae8720a6bba271e0f60b6a217f8a5210`. At review time on 2026-10-14,
+Playwright (`sha256:717699bf…fcc6`) and NuQ Postgres
+(`sha256:9b638af7…e8fc`) were official GHCR `latest` manifests, pinned by their
+observed digests; their source commit relationship to the API release was not
+established. The API, browser and database manifests list Linux amd64 and
+arm64. Known per-architecture compressed OCI sizes are API 571/559 MB,
+Playwright 555/587 MB, and NuQ Postgres 162/160 MB (amd64/arm64). Redis
+(`sha256:858f009f…3499`) and RabbitMQ (`sha256:e582c0bc…1f69`) are also
+digest-pinned; their manifest architecture set includes Linux amd64 and arm64.
+Digest pins make these observations reproducible, but do not prove the full
+stack was run or that all component versions work together.
+
+The API uses Firecrawl's self-host default `USE_DB_AUTHENTICATION=false`.
+Its host port defaults to loopback, `http://127.0.0.1:3002`; projects in a
+compatible Lerd container should use the API component's internal bundle
+hostname and port 3002 (for example, `http://lerd-firecrawl-api:3002` only
+when that runtime provides this alias). Loopback host publication does not
+isolate the unauthenticated API from other containers on Lerd's shared network.
+Treat every container that can reach that network as trusted. Do not expose this
+API to untrusted callers or the LAN.
+
+The reviewed Playwright source blocks direct requests to loopback/private
+addresses, and an isolated build of the v2.11.162 source returned 403 for
+loopback, RFC1918, link-local/metadata, and Docker bridge target addresses.
+A controlled redirect-to-private end-to-end test did not complete, so that
+behavior remains unverified. Source review found both browser request
+interception and a local SSRF proxy that rechecks destination DNS; this is not
+runtime proof for redirects. CVE-2026-32857 (GHSA-9j9r-wghq-j565) describes a
+redirect-based SSRF bypass in Firecrawl 2.8.0 and earlier; it does not establish
+a vulnerability in 2.11.162. The descriptor is documented only for
+trusted-local development, not as safe for untrusted URL submissions. A
+compatible Lerd runtime and a successful lifecycle/scrape check are still
+required before installation can be claimed.
 
 ## License
 
